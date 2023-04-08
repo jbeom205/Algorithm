@@ -1,0 +1,75 @@
+-- 문제 오류
+-- CAR_RENTAL_COMPANY_DISCOUNT_PLAN.DUTAION_TYPE 이 아닌 DURATION_TYPE임
+-- DB 결과는 DURATION_TYPE으로 나오지만 문제는 DUTAION_TYPE으로 작성함
+
+
+-- CAR_RENTAL_COMPANY_CAR: 대여 중인 자동차들의 정보
+-- CAR_ID:자동차ID, CAR_TYPE:자동차종류, DAILY_FEE:일일 대여 요금(원), OPTIONS: 자동차 옵션 리스트
+-- CAR_RENTAL_COMPANY_RENTAL_HISTORY: 자동차 대여 기록 정보
+-- HISTORY_ID:대여기록 ID, CAR_ID:자동차ID, START_DATE:대여 시작일, END_DATE:대여 종료일
+-- CAR_RENTAL_COMPANY_DISCOUNT_PLAN : 자동차 종류 별 대여 기간 종류 별 할인 정책 정보
+-- PLAN_ID: 요금할인정책ID, CAR_TYPE:자동차종류, DUTAION_TYPE:대여기간종류, DISCOUNT_RATE:할인율(%)
+
+-- 문제
+-- 자동차 종류(CAR_TYPE)가 '세단' or 'SUV'인 자동차 중 
+-- 2022-11-01 ~ 2022-11-30 대여 가능하고, 30일간의 대여 금액이 50만원(500000)이상 200만원(2000000)미만
+-- 자동자ID(CAR_ID), 자동차 종류(CAR_TYPE), 대여금액(FEE)
+-- 대여금액 내림차순 정렬, 대여금액이 같으면 자동차 종류 기준 오름차순, 자동차 종류도 같으면 자동차ID 기준 내림차순
+-- => FEE DESC, CAR_TYPE ASC, CAR_ID DESC
+
+
+
+-- 자동차 종류가 '세단' 또는 'SUV' 인 자동차 중 2022년 11월 1일 부터 2022년 11월 30일까지 대여 기록이 있는 자동차ID
+-- 11월 1~30일까지 대여 기록이 있다:  대여시작일 <= 11/30  and 11/1 <= 대여 종료일
+# SELECT CRCC.CAR_ID, CRCRH.START_DATE, CRCRH.END_DATE
+# FROM CAR_RENTAL_COMPANY_CAR AS CRCC
+# INNER JOIN CAR_RENTAL_COMPANY_RENTAL_HISTORY AS CRCRH ON CRCC.CAR_ID = CRCRH.CAR_ID
+# WHERE CRCC.CAR_TYPE IN ('세단','SUV')  
+# AND END_DATE >= "2022-11-01" AND START_DATE <= "2022-11-30"
+# GROUP BY CRCC.CAR_ID
+# ORDER BY CRCC.CAR_ID;
+
+
+
+
+-- 자동차 종류가 '세단' 또는 'SUV' 인 자동차 중 2022년 11월 1일 부터 2022년 11월 30일까지 대여 가능한 자동차 ID
+# SELECT *
+# FROM CAR_RENTAL_COMPANY_CAR AS CRCC
+# WHERE CRCC.CAR_TYPE IN ('세단','SUV')  
+# AND CRCC.CAR_ID NOT IN (SELECT CRCRH.CAR_ID
+#                         FROM CAR_RENTAL_COMPANY_RENTAL_HISTORY AS CRCRH 
+#                         WHERE END_DATE >= "2022-11-01" AND START_DATE <= "2022-11-30"
+#                         GROUP BY CRCC.CAR_ID);
+                        
+                        
+-- 자동차 종류가 '세단' 또는 'SUV' 인 자동차 중 2022년 11월 1일 부터 2022년 11월 30일까지 대여 가능한 자동차의 대여 금액(할인률 적용)
+# SELECT CRCC.CAR_ID, CRCC.CAR_TYPE, ( CRCC.DAILY_FEE * 30 ) AS FEE, 
+#       ( CRCC.DAILY_FEE * 30 * (100- CRCDP.DISCOUNT_RATE) / 100) AS 'FEE(SALE)', CRCDP.DISCOUNT_RATE
+# FROM CAR_RENTAL_COMPANY_CAR AS CRCC
+# INNER JOIN CAR_RENTAL_COMPANY_DISCOUNT_PLAN AS CRCDP ON CRCC.CAR_TYPE = CRCDP.CAR_TYPE
+# WHERE CRCC.CAR_TYPE IN ('세단','SUV')  
+# AND CRCC.CAR_ID NOT IN (SELECT CRCRH.CAR_ID
+#                         FROM CAR_RENTAL_COMPANY_RENTAL_HISTORY AS CRCRH 
+#                         WHERE END_DATE >= "2022-11-01" AND START_DATE <= "2022-11-30"
+#                         GROUP BY CRCC.CAR_ID)
+# AND CRCDP.DURATION_TYPE = '30일 이상';
+
+
+-- 자동차 종류(CAR_TYPE)가 '세단' or 'SUV'인 자동차 중 
+-- 2022-11-01 ~ 2022-11-30 대여 가능하고, 30일간의 대여 금액이 50만원(500000)이상 200만원(2000000)미만
+-- 자동자ID(CAR_ID), 자동차 종류(CAR_TYPE), 대여금액(FEE)
+-- 대여금액 내림차순 정렬, 대여금액이 같으면 자동차 종류 기준 오름차순, 자동차 종류도 같으면 자동차ID 기준 내림차순
+-- => FEE DESC, CAR_TYPE ASC, CAR_ID DESC
+SELECT RESULT.CAR_ID, RESULT.CAR_TYPE, FLOOR(RESULT.FEE) AS FEE
+FROM (SELECT CRCC.CAR_ID, CRCC.CAR_TYPE,  ( CRCC.DAILY_FEE * 30 * (100- CRCDP.DISCOUNT_RATE) / 100) AS FEE
+    FROM CAR_RENTAL_COMPANY_CAR AS CRCC
+    INNER JOIN CAR_RENTAL_COMPANY_DISCOUNT_PLAN AS CRCDP ON CRCC.CAR_TYPE = CRCDP.CAR_TYPE
+    WHERE CRCC.CAR_TYPE IN ('세단','SUV')  
+    AND CRCC.CAR_ID NOT IN (SELECT CRCRH.CAR_ID
+                            FROM CAR_RENTAL_COMPANY_RENTAL_HISTORY AS CRCRH 
+                            WHERE END_DATE >= "2022-11-01" AND START_DATE <= "2022-11-30"
+                            GROUP BY CRCC.CAR_ID)
+    AND CRCDP.DURATION_TYPE = '30일 이상') AS RESULT
+WHERE RESULT.FEE >= 500000 AND RESULT.FEE < 2000000
+ORDER BY RESULT.FEE DESC, RESULT.CAR_TYPE ASC, RESULT.CAR_ID DESC;
+
